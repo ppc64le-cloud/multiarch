@@ -1,0 +1,63 @@
+name: Build Multi-Arch Image via Native
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    name: Build Multi-Arch image via Native
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install SSH key (ppc64le)
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.RUNNER_PPC64LE_SSH_KEY }}
+          name: id_rsa_ppc64le
+          known_hosts: unnecessary
+          config: |
+            Host runner-ppc64le
+              HostName ${{ secrets.RUNNER_PPC64LE_SSH_HOST }}
+              User root
+              IdentityFile ~/.ssh/id_rsa_ppc64le
+              StrictHostKeyChecking no
+
+      - name: Install SSH key (arm64)
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.RUNNER_ARM64_SSH_KEY }}
+          name: id_rsa_arm64
+          known_hosts: unnecessary
+          config: |
+            Host runner-arm64
+              HostName ${{ secrets.RUNNER_ARM64_SSH_HOST }}
+              User root
+              IdentityFile ~/.ssh/id_rsa_arm64
+              StrictHostKeyChecking no
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          version: v0.11.0
+          platforms: linux/amd64
+          append: |
+            - endpoint: ssh://runner-ppc64le
+              platforms: linux/ppc64le
+            - endpoint: ssh://runner-arm64
+              platforms: linux/arm64
+
+      - name: Login to container registry
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+          registry: ${{ vars.REGISTRY }}
+
+      - name: Build and Push Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./native/
+          tags: ${{ vars.REGISTRY }}/${{ vars.REPO_NAME }}/${{ vars.IMAGE_NAME }}:latest
+          platforms: linux/amd64,linux/arm64,linux/ppc64le
+          push: true

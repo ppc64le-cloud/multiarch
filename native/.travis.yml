@@ -1,0 +1,45 @@
+os: linux
+dist: focal
+language: shell
+
+branches:
+  only:
+    - main
+
+jobs:
+  include:
+    - stage: Build specific target architecture images
+    - name: Build Multi-Arch Image on amd64
+      arch: amd64
+      services:
+        - docker
+      script:
+        - docker login -u "$REGISTRY_USERNAME" --password "$REGISTRY_PASSWORD" $REGISTRY
+        - docker build -t $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest-amd64 .
+        - docker push $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest-amd64
+
+    - name: Build Multi-Arch Image on arm64
+      arch: arm64
+      services:
+        - docker
+      script:
+        - docker login -u "$REGISTRY_USERNAME" --password "$REGISTRY_PASSWORD" $REGISTRY
+        - docker build -t $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest-arm64 .
+        - docker push $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest-arm64
+
+    - name: Build Multi-Arch Image on ppc64le
+      arch: ppc64le
+      services:
+        - docker
+      script:
+        - docker login -u "$REGISTRY_USERNAME" --password "$REGISTRY_PASSWORD" $REGISTRY
+        - docker build -t $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest-ppc64le .
+        - docker push $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest-ppc64le
+
+    - stage: Create and Push Image Manifest
+      services:
+        - docker
+      script:
+        - docker login -u "$REGISTRY_USERNAME" --password "$REGISTRY_PASSWORD" $REGISTRY
+        - docker manifest create --amend $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest-amd64 $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest-arm64 $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest-ppc64le
+        - docker manifest push $REGISTRY/$REPO_NAME/$IMAGE_NAME:latest
